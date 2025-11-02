@@ -7,3 +7,5 @@ unstructured
 markdown
 sentence-transformers
 langchain-huggingface
+python-dotenv
+langchain-google-genai
