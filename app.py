@@ -109,21 +109,27 @@ if prompt := st.chat_input("Ask me about Data Structures and Algorithms..."):
 
     # 5. Get and display AI response
     with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
 
-            # 6. Create the input dictionary for the chain
-            #    We pass the ENTIRE 'messages' list as the chat_history
-            chain_input = {
-                "input": prompt,
-                "chat_history": st.session_state.messages
-            }
+        response_container = st.empty()
+        full_response = ""
+        # 6. Create the input dictionary for the chain
+        #    We pass the ENTIRE 'messages' list as the chat_history
+        chain_input = {
+            "input": prompt,
+            "chat_history": st.session_state.messages
+        }
 
-          #  Response from the retrieval chain
-            response_string = retrieval_chain.invoke(chain_input)
+        # Stream the response
+        # Because your chain ends in StrOutputParser, 'chunk' is a string
+        for chunk in retrieval_chain.stream(chain_input):
+            full_response += chunk
+            response_container.markdown(full_response + "▌") # Typing indicator
 
-            # 7. Display the string response
-            st.markdown(response_string)
+            # Display the final, complete response without the typing indicator
+            response_container.markdown(full_response)
+
+
 
             # 8. Add the AI's string response to the SINGLE history
             st.session_state.messages.append(
-                AIMessage(content=response_string))
+                AIMessage(content=full_response))
