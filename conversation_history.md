@@ -120,3 +120,38 @@ This file tracks the conversation about building a DSA teaching AI.
 
 **Next Steps:**
 *   Continue building and refining the DSA AI Tutor.
+
+---
+
+## Session Summary (2025-11-18)
+
+**Goal:** Migrate from FAISS to PGVector for the RAG model and containerize the application.
+
+**Accomplishments:**
+1.  **Updated `requirements.txt`:**
+    *   Added `langchain-postgres`, `psycopg`, `transformers`, and `langfuse`.
+    *   Removed `faiss-cpu`.
+2.  **Updated `ingest.py`:**
+    *   Modified to use `PGVector` for the vector store.
+    *   Switched to `BAAI/bge-small-en-v1.5` for embeddings.
+    *   Implemented advanced chunking using `AutoTokenizer` and added rich metadata to document chunks.
+    *   Integrated `SQLRecordManager` for index management.
+3.  **Updated `app.py`:**
+    *   Modified to connect to `PGVector` instead of loading a local FAISS index.
+    *   Updated embedding function to `BAAI/bge-small-en-v1.5`.
+    *   Configured the retriever to use Maximal Marginal Relevance (MMR) search.
+    *   Retained the original LLM model (`gemini-2.0-flash-thinking-exp-1219` with `temperature=0`) as per user request.
+    *   Adjusted the RAG chain structure for explicit context and chat history handling.
+4.  **Containerization:**
+    *   Created a `Dockerfile` for the Python application.
+    *   Created a `docker-compose.yml` file to orchestrate a PostgreSQL service with PGVector and the Python application service.
+    *   Created a `.env.example` file listing all necessary environment variables (PostgreSQL, Google API Key, Langfuse).
+5.  **Explanation Provided:**
+    *   Explained the functionality of `HF_HOME`, `SENTENCE_TRANSFORMERS_HOME` environment variables, and the `huggingface_cache` Docker volume for persisting downloaded embedding models.
+
+**Next Steps:**
+*   **Install new dependencies:** Run `source .venv/bin/activate && uv pip install -r requirements.txt`.
+*   **Set up environment variables:** Create a `.env` file based on `.env.example` and populate it with actual values, especially for PostgreSQL connection and `GOOGLE_API_KEY`.
+*   **Build and run Docker containers:** Use `docker-compose up --build` to start the services.
+*   **Ingest data:** Run `python ingest.py` (or `docker-compose exec app python ingest.py`) to populate the PGVector database.
+*   **Test application:** Access the Streamlit application in the browser (usually `http://localhost:8501`).

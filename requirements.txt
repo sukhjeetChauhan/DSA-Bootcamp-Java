@@ -1,7 +1,9 @@
 langchain
 streamlit
 pypdf
-faiss-cpu
+langchain-postgres
+psycopg
+transformers
 langchain-community
 unstructured
 markdown
@@ -10,3 +12,4 @@ langchain-huggingface
 python-dotenv
 langchain-google-genai
 watchdog
+langfuse

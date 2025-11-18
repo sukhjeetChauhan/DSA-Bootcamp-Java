@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: pgvector_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+
+  app:
+    build: .
+    container_name: dsa_tutor_app
+    ports:
+      - "8501:8501"
+    depends_on:
+      - db
+    environment:
+      # --- PostgreSQL Connection ---
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+      - POSTGRES_HOST=db
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+      
+      # --- Google API Key ---
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+
+      # --- Langfuse Observability ---
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - LANGFUSE_HOST=${LANGFUSE_HOST}
+
+      # --- Hugging Face Cache Settings ---
+      # These variables direct Hugging Face libraries to use a specific folder for caching.
+      # We mount this folder as a volume to persist downloaded models between container runs.
+      - HF_HOME=/app/huggingface
+      - SENTENCE_TRANSFORMERS_HOME=/app/huggingface/sentence_transformers
+    volumes:
+      - huggingface_cache:/app/huggingface
+
+volumes:
+  postgres_data:
+  huggingface_cache:
