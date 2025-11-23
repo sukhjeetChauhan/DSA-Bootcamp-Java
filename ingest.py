@@ -4,7 +4,8 @@ from langchain_community.document_loaders import PyPDFLoader, TextLoader, Unstru
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_postgres import PGVector
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain.indexes import SQLRecordManager, index
+from langchain_community.indexes import SQLRecordManager
+from langchain_core.indexing import index
 from transformers import AutoTokenizer
 
 # --- CONFIGURATION ---
@@ -38,7 +39,7 @@ def main():
             elif file.endswith(".txt"):
                 loader = TextLoader(file_path)
                 documents.extend(loader.load())
-    
+
     print(f"Loaded {len(documents)} documents.")
 
     # 2. Modern chunking with tokenizer
@@ -74,7 +75,7 @@ def main():
         driver="psycopg",
         user=os.getenv('POSTGRES_USER', 'postgres'),
         password=os.getenv('POSTGRES_PASSWORD', 'password'),
-        host=os.getenv('POSTGRES_HOST', 'db'),
+        host=os.getenv('POSTGRES_HOST', 'localhost'),
         port=5432,
         database=os.getenv('POSTGRES_DB', 'postgres'),
     )
@@ -88,7 +89,7 @@ def main():
 
     # 6. Setup index management
     namespace = f"pgvector/{TABLE_NAME}"
-    RECORD_MANAGER_URL = f"postgresql+psycopg://{os.getenv('POSTGRES_USER', 'postgres')}:{os.getenv('POSTGRES_PASSWORD', 'password')}@{os.getenv('POSTGRES_HOST', 'db')}:5432/{os.getenv('POSTGRES_DB', 'postgres')}"
+    RECORD_MANAGER_URL = f"postgresql+psycopg://{os.getenv('POSTGRES_USER', 'postgres')}:{os.getenv('POSTGRES_PASSWORD', 'password')}@{os.getenv('POSTGRES_HOST', 'localhost')}:5432/{os.getenv('POSTGRES_DB', 'postgres')}"
 
     record_manager = SQLRecordManager(namespace, db_url=RECORD_MANAGER_URL)
     record_manager.create_schema()
