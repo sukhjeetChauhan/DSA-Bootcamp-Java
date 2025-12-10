@@ -1,6 +1,6 @@
-# Conversation History
+# Development History
 
-This file tracks the conversation about building a DSA teaching AI.
+This file tracks the development conversation about building a DSA teaching AI.
 
 **User's Goal:** Build an AI system on top of the `DSA-Bootcamp-Java` repository to teach data structures and algorithms.
 
@@ -39,7 +39,7 @@ This file tracks the conversation about building a DSA teaching AI.
     *   Create vector embeddings.
     *   Store the embeddings in a local FAISS vector database.
 
-**User's Response:** ok save this in conversation history. we will pick it up from here tomorrow
+**User's Response:** ok save this in development history. we will pick it up from here tomorrow
 
 ---
 
@@ -155,3 +155,77 @@ This file tracks the conversation about building a DSA teaching AI.
 *   **Build and run Docker containers:** Use `docker-compose up --build` to start the services.
 *   **Ingest data:** Run `python ingest.py` (or `docker-compose exec app python ingest.py`) to populate the PGVector database.
 *   **Test application:** Access the Streamlit application in the browser (usually `http://localhost:8501`).
+
+---
+
+## Session Summary (2025-11-23)
+
+**Goal:** Add conversation history persistence and enable model to read previous interactions.
+
+**Accomplishments:**
+1. **Conversation History System:**
+   * Created `save_interaction()` function to automatically save user-AI exchanges to `user_interactions.md`
+   * Created `load_conversation_history()` function to load previous conversations
+   * Implemented automatic session organization by date
+   * Added token limit management (loads last 5 sessions to avoid exceeding limits)
+
+2. **Model Integration:**
+   * Modified RAG chain to dynamically load conversation history before each interaction
+   * Integrated history into system prompt for context awareness
+   * Model can now reference previous conversations to maintain continuity
+
+3. **Model Configuration Updates:**
+   * Updated LLM model from `gemini-2.0-flash-thinking-exp-1219` to `gemini-2.5-flash`
+   * Changed temperature from `0` to `0.7` for more varied responses
+
+4. **New File Created:**
+   * `user_interactions.md` - Stores actual user-AI conversation history (separate from development history)
+
+**Technical Details:**
+* History is loaded dynamically via `create_chain_with_history()` function
+* Each interaction is automatically saved after AI response
+* History file uses markdown format with timestamps and session headers
+* System prompt includes history section when available
+
+**Next Steps:**
+* Test the history persistence across multiple sessions
+* Monitor token usage with history integration
+* Consider adding history management UI (clear history, export, etc.)
+
+---
+
+## Session Summary (2025-01-XX)
+
+**Goal:** Add Text-to-Speech (TTS) functionality using ElevenLabs API.
+
+**Accomplishments:**
+1. **ElevenLabs Integration:**
+   * Added `elevenlabs` package to `requirements.txt`
+   * Imported `AsyncElevenLabs` client from `elevenlabs.client`
+   * Configured ElevenLabs constants (voice ID, model ID, API key) in `app.py`
+
+2. **TTS Functions Implemented:**
+   * Created `stream_tts_async()` function to asynchronously stream TTS audio from ElevenLabs API
+   * Created `generate_tts_audio()` wrapper function to handle async TTS generation in Streamlit's sync context
+   * Implemented proper error handling for event loop conflicts in Streamlit
+
+3. **User Interface Updates:**
+   * Added sidebar checkbox to enable/disable TTS functionality
+   * Integrated TTS audio generation into the chat response flow
+   * Implemented audio playback using `st.audio()` with `autoplay=True` parameter
+   * Added spinner feedback during audio generation
+
+4. **Configuration:**
+   * Set default voice ID: `JBFqnCBsd6RMkjVDRZzb`
+   * Set model ID: `eleven_multilingual_v2`
+   * Configured output format: `mp3_44100_128`
+   * Added environment variable support for `ELEVEN_LABS_API` key
+
+**Technical Details:**
+* TTS generation happens after AI response is complete
+* Audio is generated only when TTS is enabled and API key is available
+* Uses async streaming API for efficient audio generation
+* Handles both new event loops and existing loops in Streamlit context
+
+**Next Steps:**
+* **Implement auto-play audio without visible player:** Replace `st.audio()` with HTML audio element that autoplays but has no visible controls. This will allow audio to play automatically in the background without showing a player interface to the user.

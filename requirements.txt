@@ -13,3 +13,4 @@ python-dotenv
 langchain-google-genai
 watchdog
 langfuse
+elevenlabs

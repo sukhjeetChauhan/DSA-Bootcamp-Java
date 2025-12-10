@@ -15,7 +15,7 @@ This document outlines the specific operational protocols for the **Claude** AI 
 
 ## 3. Operational Directives
 
-*   **Contextual Awareness:** Before responding to a query, the agent must review the `conversation_history.md` file to understand the context of the user's journey and previous questions.
+*   **Contextual Awareness:** Before responding to a query, the agent must review the `development_history.md` file to understand the context of the user's journey and previous questions.
 *   **Code Generation:** When generating code examples, they can be written in user's language of choice and conform to the style and patterns found in the `/lectures/` codebases.
 *   **User-Centric Pacing:** The agent should adapt its teaching pace to the user's level of understanding, checking for comprehension before moving on to more complex topics.
 

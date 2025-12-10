@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import asyncio
 from datetime import datetime
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -10,6 +11,7 @@ from langchain_postgres import PGVector
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.messages import AIMessage, HumanMessage
 from langfuse.langchain import CallbackHandler
+from elevenlabs.client import AsyncElevenLabs
 
 
 # --- LOAD .env ---
@@ -17,13 +19,16 @@ load_dotenv()
 
 # --- CONFIGURATION ---
 # Please set the following environment variables before running the script:
-# GOOGLE_API_KEY, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_HOST, POSTGRES_DB
+# GOOGLE_API_KEY, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_HOST, POSTGRES_DB, ELEVENLABS_API_KEY
 st.set_page_config(page_title="DSA AI Tutor", page_icon="🤖")
 st.title("DSA AI Tutor")
 
 EMBEDDING_MODEL_NAME = "BAAI/bge-small-en-v1.5"
 TABLE_NAME = "dsa_tutor_collection"
 HISTORY_FILE = "user_interactions.md"
+ELEVENLABS_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"  # Default voice ID
+ELEVENLABS_MODEL_ID = "eleven_multilingual_v2"
+ELEVENLABS_API_KEY = os.getenv("ELEVEN_LABS_API")
 
 # --- CONVERSATION HISTORY FUNCTIONS ---
 def load_conversation_history():
@@ -184,6 +189,78 @@ def initialize_langchain():
 
 create_chain = initialize_langchain()
 
+# --- ELEVENLABS TTS FUNCTIONS ---
+
+async def stream_tts_async(text: str, api_key: str, voice_id: str, model_id: str):
+    """Stream TTS audio asynchronously and return audio bytes."""
+    if not api_key:
+        return None
+
+    audio_chunks = []
+
+    try:
+        # Create async client
+        client = AsyncElevenLabs(api_key=api_key)
+
+        # Use the async streaming API (returns async generator, no await needed)
+        audio_stream = client.text_to_speech.stream(
+            text=text,
+            voice_id=voice_id,
+            model_id=model_id,
+            output_format="mp3_44100_128",
+        )
+
+        # Collect all audio chunks asynchronously
+        async for chunk in audio_stream:
+            if chunk:
+                audio_chunks.append(chunk)
+
+        # Combine all chunks into a single bytes object
+        return b''.join(audio_chunks)
+    except Exception as e:
+        st.error(f"Error generating TTS: {e}")
+        return None
+
+def generate_tts_audio(text: str, api_key: str, voice_id: str, model_id: str):
+    """Wrapper to run async TTS generation in sync context."""
+    if not api_key:
+        return None
+
+    # Run async function in sync context
+    try:
+        # Use asyncio.run() which works well in Streamlit's context
+        audio_bytes = asyncio.run(
+            stream_tts_async(text, api_key, voice_id, model_id)
+        )
+        return audio_bytes
+    except RuntimeError:
+        # If there's already an event loop running, create a new one
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            audio_bytes = loop.run_until_complete(
+                stream_tts_async(text, api_key, voice_id, model_id)
+            )
+            loop.close()
+            return audio_bytes
+        except Exception as e:
+            st.error(f"Error in TTS generation: {e}")
+            return None
+    except Exception as e:
+        st.error(f"Error in TTS generation: {e}")
+        return None
+
+# --- SIDEBAR CONFIGURATION ---
+with st.sidebar:
+    st.header("Settings")
+    enable_tts = st.checkbox("Enable Text-to-Speech", value=False)
+
+    # Check for ElevenLabs API key
+    elevenlabs_api_key = ELEVENLABS_API_KEY
+    if not elevenlabs_api_key:
+        st.warning("ELEVENLABS_API_KEY not set. TTS will be disabled.")
+        enable_tts = False
+
 # --- CHAT INTERFACE ---
 if "messages" not in st.session_state:
     st.session_state.messages = [
@@ -220,6 +297,19 @@ if prompt := st.chat_input("Ask me about Data Structures and Algorithms..."):
 
         response_container.markdown(full_response)
         st.session_state.messages.append(AIMessage(content=full_response))
+
+        # Generate and play TTS audio if enabled
+        if enable_tts and elevenlabs_api_key and full_response.strip():
+            with st.spinner("Generating audio..."):
+                audio_bytes = generate_tts_audio(
+                    full_response,
+                    elevenlabs_api_key,
+                    ELEVENLABS_VOICE_ID,
+                    ELEVENLABS_MODEL_ID
+                )
+
+                if audio_bytes:
+                    st.audio(audio_bytes, format="audio/mp3", autoplay=True)
 
         # Save the interaction to history file
         save_interaction(prompt, full_response)

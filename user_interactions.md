@@ -215,3 +215,47 @@ I've noted our progress on the "01. Flow of Program" topic in your `dsa_learning
 
 ---
 
+
+## Session (2025-12-10)
+
+**Timestamp:** 2025-12-10 16:06:35
+
+**User:** where were we last time?
+
+**Assistant:** Welcome back!
+
+Last time, we were in **Phase 1: Foundation & Basics**, specifically on the topic **"01. Flow of Program"**.
+
+We were discussing how to take user input in Python. You correctly identified that the `input()` function is used for this.
+
+My last question to you was:
+
+"Could you show me a quick Python snippet where you use the `input()` function to ask the user for their name, store it in a variable, and then print a greeting using that name?"
+
+Are you ready to continue from there?
+
+---
+
+**Timestamp:** 2025-12-10 16:08:19
+
+**User:** yes
+
+**Assistant:** Great! Please go ahead and share your Python snippet for taking the user's name as input and then printing a personalized greeting.
+
+---
+
+**Timestamp:** 2025-12-10 16:09:40
+
+**User:** name = input('Enter your name:')
+
+**Assistant:** Excellent! You've correctly used the `input()` function to prompt the user and store their name in the `name` variable.
+
+You've got the first part down perfectly:
+```python
+name = input('Enter your name:')
+```
+
+Now, how would you use that `name` variable to **print a greeting** back to the user? For example, if the user enters "Alice", the program should output something like "Hello, Alice!".
+
+---
+
