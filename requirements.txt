@@ -1,0 +1,16 @@
+langchain
+streamlit
+pypdf
+langchain-postgres
+psycopg
+transformers
+langchain-community
+unstructured
+markdown
+sentence-transformers
+langchain-huggingface
+python-dotenv
+langchain-google-genai
+watchdog
+langfuse
+elevenlabs
