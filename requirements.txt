@@ -14,3 +14,4 @@ langchain-google-genai
 watchdog
 langfuse
 elevenlabs
+streamlit_code_editor

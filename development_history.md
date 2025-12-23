@@ -194,9 +194,9 @@ This file tracks the development conversation about building a DSA teaching AI.
 
 ---
 
-## Session Summary (2025-01-XX)
+## Session Summary (2025-12-23)
 
-**Goal:** Add Text-to-Speech (TTS) functionality using ElevenLabs API.
+**Goal:** Add Text-to-Speech (TTS) functionality using ElevenLabs API and implement auto-play audio.
 
 **Accomplishments:**
 1. **ElevenLabs Integration:**
@@ -206,13 +206,15 @@ This file tracks the development conversation about building a DSA teaching AI.
 
 2. **TTS Functions Implemented:**
    * Created `stream_tts_async()` function to asynchronously stream TTS audio from ElevenLabs API
-   * Created `generate_tts_audio()` wrapper function to handle async TTS generation in Streamlit's sync context
-   * Implemented proper error handling for event loop conflicts in Streamlit
+   * Created `generate_tts_audio()` wrapper function with improved async handling
+   * Implemented `concurrent.futures.ThreadPoolExecutor` to properly handle event loop conflicts in Streamlit
+   * Changed error handling in async function from `st.error()` to `print()` for better async compatibility
 
 3. **User Interface Updates:**
    * Added sidebar checkbox to enable/disable TTS functionality
    * Integrated TTS audio generation into the chat response flow
-   * Implemented audio playback using `st.audio()` with `autoplay=True` parameter
+   * Replaced `st.audio()` with custom HTML audio element using base64 encoding
+   * Implemented JavaScript autoplay attempt with fallback handling for browser autoplay policies
    * Added spinner feedback during audio generation
 
 4. **Configuration:**
@@ -221,11 +223,21 @@ This file tracks the development conversation about building a DSA teaching AI.
    * Configured output format: `mp3_44100_128`
    * Added environment variable support for `ELEVEN_LABS_API` key
 
+5. **Bug Fixes:**
+   * Fixed history context escaping issue: Added curly brace escaping (`{` → `{{`, `}` → `}}`) in `create_chain_with_history()` to prevent LangChain from interpreting history content as template variables
+
 **Technical Details:**
 * TTS generation happens after AI response is complete
 * Audio is generated only when TTS is enabled and API key is available
 * Uses async streaming API for efficient audio generation
-* Handles both new event loops and existing loops in Streamlit context
+* Improved event loop handling: Uses `ThreadPoolExecutor` when a running event loop is detected, otherwise uses `asyncio.run()`
+* Audio is base64-encoded and embedded in HTML data URI for playback
+* JavaScript attempts autoplay but may be blocked by browser policies (user can still click play if blocked)
+* Audio element currently shows controls (next step: hide controls for true background playback)
+
+**New Imports:**
+* Added `base64` for encoding audio bytes to base64 string
+* Added `concurrent.futures` for ThreadPoolExecutor in async handling
 
 **Next Steps:**
-* **Implement auto-play audio without visible player:** Replace `st.audio()` with HTML audio element that autoplays but has no visible controls. This will allow audio to play automatically in the background without showing a player interface to the user.
+* **Hide audio player controls:** Modify HTML audio element to remove visible controls (`controls` attribute) while maintaining autoplay functionality. This will enable true background audio playback without showing any player interface to the user.

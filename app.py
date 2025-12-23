@@ -1,6 +1,8 @@
 import streamlit as st
 import os
 import asyncio
+import base64
+import concurrent.futures
 from datetime import datetime
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -12,6 +14,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.messages import AIMessage, HumanMessage
 from langfuse.langchain import CallbackHandler
 from elevenlabs.client import AsyncElevenLabs
+from code_editor import code_editor
 
 
 # --- LOAD .env ---
@@ -141,7 +144,7 @@ def initialize_langchain():
     # 4. Initialize the LLM (keeping the old model as requested)
     llm = ChatGoogleGenerativeAI(
       callbacks=[handler],
-      model="gemini-2.5-flash",
+      model="gemini-2.5-flash-lite",
       temperature=0.7,
     )
 
@@ -160,7 +163,9 @@ def initialize_langchain():
         history_context = load_conversation_history()
         history_section = ""
         if history_context:
-            history_section = f"\n\n## Previous Conversation History\n\nYou have access to previous conversation history. Use this to understand context and maintain continuity in your teaching:\n\n{history_context}\n\n---\n\nNote: Use this history to understand the student's learning journey, but focus on the current conversation in your responses."
+            # Escape curly braces in history to prevent LangChain from interpreting them as template variables
+            escaped_history = history_context.replace("{", "{{").replace("}", "}}")
+            history_section = f"\n\n## Previous Conversation History\n\nYou have access to previous conversation history. Use this to understand context and maintain continuity in your teaching:\n\n{escaped_history}\n\n---\n\nNote: Use this history to understand the student's learning journey, but focus on the current conversation in your responses."
 
         # Create prompt with history
         system_prompt = f"{base_system_prompt}{history_section}"
@@ -218,7 +223,8 @@ async def stream_tts_async(text: str, api_key: str, voice_id: str, model_id: str
         # Combine all chunks into a single bytes object
         return b''.join(audio_chunks)
     except Exception as e:
-        st.error(f"Error generating TTS: {e}")
+        # Don't use st.error() in async function - return error info instead
+        print(f"Error generating TTS: {e}")
         return None
 
 def generate_tts_audio(text: str, api_key: str, voice_id: str, model_id: str):
@@ -228,32 +234,42 @@ def generate_tts_audio(text: str, api_key: str, voice_id: str, model_id: str):
 
     # Run async function in sync context
     try:
-        # Use asyncio.run() which works well in Streamlit's context
-        audio_bytes = asyncio.run(
-            stream_tts_async(text, api_key, voice_id, model_id)
-        )
-        return audio_bytes
-    except RuntimeError:
-        # If there's already an event loop running, create a new one
+        # Check if there's already a running event loop
         try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            audio_bytes = loop.run_until_complete(
+            loop = asyncio.get_running_loop()
+            # If there's a running loop, use a thread to run the async function
+            def run_in_thread():
+                # Create a new event loop in this thread
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                try:
+                    return new_loop.run_until_complete(
+                        stream_tts_async(text, api_key, voice_id, model_id)
+                    )
+                finally:
+                    new_loop.close()
+
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(run_in_thread)
+                audio_bytes = future.result()
+        except RuntimeError:
+            # No running loop, safe to use asyncio.run()
+            audio_bytes = asyncio.run(
                 stream_tts_async(text, api_key, voice_id, model_id)
             )
-            loop.close()
-            return audio_bytes
-        except Exception as e:
-            st.error(f"Error in TTS generation: {e}")
-            return None
+        return audio_bytes
     except Exception as e:
         st.error(f"Error in TTS generation: {e}")
         return None
+
+
+
 
 # --- SIDEBAR CONFIGURATION ---
 with st.sidebar:
     st.header("Settings")
     enable_tts = st.checkbox("Enable Text-to-Speech", value=False)
+    enable_ide = st.checkbox("Enable Code Editor", value=False )
 
     # Check for ElevenLabs API key
     elevenlabs_api_key = ELEVENLABS_API_KEY
@@ -266,6 +282,26 @@ if "messages" not in st.session_state:
     st.session_state.messages = [
         AIMessage(content="How can I help you?")]
 
+# Initialize code editor content in session state
+if "code_editor_content" not in st.session_state:
+    st.session_state.code_editor_content = "# write your code here\n\n"
+
+# Display code editor if enabled
+if enable_ide:
+    st.subheader("📝 Code Editor")
+    st.caption("Write your code below. When you submit a message, your code will be included.")
+
+    code_response = code_editor(
+        st.session_state.code_editor_content,
+        lang="python"
+    )
+
+    # Update session state with latest code from editor
+    if code_response and "text" in code_response:
+        st.session_state.code_editor_content = code_response["text"]
+        # Store code to be used in next prompt
+        st.session_state.pending_code = code_response["text"]
+
 for message in st.session_state.messages:
     if isinstance(message, AIMessage):
         with st.chat_message("assistant"):
@@ -275,6 +311,20 @@ for message in st.session_state.messages:
             st.markdown(message.content)
 
 if prompt := st.chat_input("Ask me about Data Structures and Algorithms..."):
+    # Include code in prompt if IDE is enabled and code exists
+    if enable_ide and "pending_code" in st.session_state and st.session_state.pending_code.strip():
+        code_content = st.session_state.pending_code.strip()
+        # Format the prompt to include code
+        if code_content and code_content != "# write your code here":
+            formatted_prompt = f"Here's my code:\n```python\n{code_content}\n```\n\n"
+            if prompt.strip():
+                formatted_prompt += f"Question: {prompt}"
+            else:
+                formatted_prompt += "Please review this code and help me understand it."
+            prompt = formatted_prompt
+            # Clear pending code after using it
+            del st.session_state.pending_code
+
     st.session_state.messages.append(HumanMessage(content=prompt))
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -291,16 +341,18 @@ if prompt := st.chat_input("Ask me about Data Structures and Algorithms..."):
             "chat_history": st.session_state.messages
         }
 
+        # Stream response but collect it without displaying (show loading indicator)
         for chunk in retrieval_chain.stream(chain_input):
             full_response += chunk
-            response_container.markdown(full_response + "▌")
+            # Show loading indicator instead of text
+            response_container.markdown("Thinking... ▌")
 
-        response_container.markdown(full_response)
-        st.session_state.messages.append(AIMessage(content=full_response))
-
-        # Generate and play TTS audio if enabled
+        # Generate and play TTS audio if enabled (before showing final response)
+        audio_bytes = None
         if enable_tts and elevenlabs_api_key and full_response.strip():
-            with st.spinner("Generating audio..."):
+            # Show spinner while generating audio
+            # response_container.markdown("Generating audio...")
+            with st.spinner():
                 audio_bytes = generate_tts_audio(
                     full_response,
                     elevenlabs_api_key,
@@ -308,8 +360,41 @@ if prompt := st.chat_input("Ask me about Data Structures and Algorithms..."):
                     ELEVENLABS_MODEL_ID
                 )
 
-                if audio_bytes:
-                    st.audio(audio_bytes, format="audio/mp3", autoplay=True)
+        # Now show the final response only after audio generation completes
+        # (or immediately if TTS is disabled)
+        response_container.markdown(full_response)
+        st.session_state.messages.append(AIMessage(content=full_response))
+
+        # Display audio if it was generated
+        if audio_bytes:
+            # Encode audio to base64 for HTML data URI
+            b64 = base64.b64encode(audio_bytes).decode()
+
+            # Create HTML audio element with JavaScript autoplay attempt
+            audio_html = f"""
+            <audio id="tts-audio-{id(audio_bytes)}" controls autoplay style="width: 100%; display: none;">
+                <source src="data:audio/mpeg;base64,{b64}" type="audio/mpeg">
+                Your browser does not support the audio element.
+            </audio>
+            <script>
+                (function() {{
+                    var audio = document.getElementById('tts-audio-{id(audio_bytes)}');
+                    if (audio) {{
+                        // Try to play immediately (may be blocked by browser)
+                        var playPromise = audio.play();
+                        if (playPromise !== undefined) {{
+                            playPromise.then(function() {{
+                                console.log('Audio autoplay started successfully');
+                            }}).catch(function(error) {{
+                                console.log('Autoplay was blocked:', error.name);
+                                // Audio player is visible, user can click play
+                            }});
+                        }}
+                    }}
+                }})();
+            </script>
+            """
+            st.markdown(audio_html, unsafe_allow_html=True)
 
         # Save the interaction to history file
         save_interaction(prompt, full_response)
